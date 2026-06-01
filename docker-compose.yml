@@ -1,0 +1,34 @@
+services:
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
+    container_name: dragonfly
+    restart: unless-stopped
+    ulimits:
+      memlock: -1
+    ports:
+      - "6379:6379"
+    volumes:
+      - dragonfly-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+#  app:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    container_name: simple-rl
+#    restart: unless-stopped
+#    depends_on:
+#      dragonfly:
+#        condition: service_healthy
+#    environment:
+#      REDIS_URL: redis://dragonfly:6379
+#    ports:
+#      - "8000:8000"
+
+
+volumes:
+  dragonfly-data:
