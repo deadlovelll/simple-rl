@@ -1,21 +1,28 @@
-use fred::error::Error;
 use crate::application::request::services::window_builder::WindowBuilder;
 use crate::domain::limit::repository::LimitRepsiotry;
+use crate::domain::limit::network_client::NetworkClient;
+use crate::domain::limit::window::Window;
+use crate::domain::limit::result::{RequestError, RequestResult};
 
-pub struct ProcessRequestImpl<R: LimitRepsiotry> {
-    window_builder: WindowBuilder,
-    rate_limit_repository: R
+pub struct ProcessRequestImpl<W: Window, R: LimitRepsiotry, N: NetworkClient> {
+    window_builder: W,
+    rate_limit_repository: R,
+    network_client: N,
 }
 
-impl<R: LimitRepsiotry> ProcessRequestImpl<R> {
-    pub fn new(window_builder: WindowBuilder, rate_limit_repository: R) -> Self {
-        Self { window_builder, rate_limit_repository }
+impl<W: Window, R: LimitRepsiotry, N: NetworkClient> ProcessRequestImpl<W, R, N> {
+    pub fn new(window_builder: W, rate_limit_repository: R, network_client: N) -> Self {
+        Self { window_builder, rate_limit_repository, network_client }
     }
 
-    pub async fn process(&self, from: &str, to: &str) -> Result<bool, Error> {
+    pub async fn process(&self, from: &str, to: &str) -> Result<RequestResult, RequestError> {
         let window = self.window_builder.build();
-        let result = self.rate_limit_repository.check_rate_limit(from, to, &window).await;
-        result
+        let can_be_processed = self.rate_limit_repository.check_rate_limit(from, to, &window).await;
+        if can_be_processed.is_ok() && can_be_processed? == false {
+            return Ok(RequestResult{ status_code: 403, result: "Can't be accessed".to_string() });
+        }
+        let request_result = self.network_client.process_request(to).await?;
+        Ok(request_result)
     }
 }
 
